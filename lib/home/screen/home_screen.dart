@@ -1,17 +1,12 @@
-
-// Home Screen
-import 'dart:convert';
+// lib/feature/home/screen/home_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import '../../model/repo_model.dart';
-import '../../model/user_model.dart';
 import '../controller/home_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   final String username;
-
   const HomeScreen({Key? key, required this.username}) : super(key: key);
 
   @override
@@ -21,85 +16,25 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   final RxBool _isGridView = true.obs;
-  final RxList<RepoModel> _repos = <RepoModel>[].obs; // Fixed: RxList
-  final Rx<UserModel> _user = UserModel.empty().obs; // Fixed: Default
-  final RxBool _isLoading = true.obs;
-  final RxString _error = ''.obs;
-
-  // Filters
-  final RxString _filterBy = 'name'.obs;
-  final Rx<DateTime?> _fromDate = Rx<DateTime?>(null);
-  final Rx<DateTime?> _toDate = Rx<DateTime?>(null);
+  late final HomeController controller;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserAndRepos();
-  }
-
-  Future<void> _fetchUserAndRepos() async {
-    _isLoading.value = true;
-    await _fetchUser();
-    await _fetchRepos();
-    _isLoading.value = false;
-  }
-
-  Future<void> _fetchUser() async {
-    try {
-      final response = await _apiGet('https://api.github.com/users/${widget.username}');
-      if (response.isSuccess) {
-        _user.value = UserModel.fromJson(response.responseData!);
-      } else {
-        _error.value = 'User not found';
-      }
-    } catch (e) {
-      _error.value = 'Network error';
-    }
-  }
-
-  Future<void> _fetchRepos() async {
-    try {
-      final response = await _apiGet('https://api.github.com/users/${widget.username}/repos');
-      if (response.isSuccess) {
-        final List<dynamic> data = response.responseData!;
-        _repos.value = data.map((repo) => RepoModel.fromJson(repo)).toList(); // Fixed: value =
-      } else {
-        _error.value = 'Failed to load repos';
-      }
-    } catch (e) {
-      _error.value = 'Network error';
-    }
-  }
-
-  Future<NetworkResponse> _apiGet(String url) async {
-    try {
-      final response = await http.get(Uri.parse(url));
-      final status = response.statusCode;
-      if (status == 200) {
-        final data = jsonDecode(response.body);
-        return NetworkResponse(statusCode: status, isSuccess: true, responseData: data);
-      } else {
-        return NetworkResponse(
-          statusCode: status,
-          isSuccess: false,
-          errorMessage: response.body,
-        );
-      }
-    } catch (e) {
-      return NetworkResponse(statusCode: -1, isSuccess: false, errorMessage: e.toString());
-    }
+    controller = Get.put(HomeController());
+    controller.fetchUserAndRepos(widget.username);
   }
 
   List<RepoModel> _getFilteredRepos() {
-    var repos = List<RepoModel>.from(_repos); // Copy
+    var repos = List<RepoModel>.from(controller.repos);
     final query = _searchController.text.toLowerCase();
 
     if (query.isNotEmpty) {
       repos = repos.where((r) => r.name.toLowerCase().contains(query)).toList();
     }
 
-    final from = _fromDate.value;
-    final to = _toDate.value;
+    final from = controller.fromDate.value;
+    final to = controller.toDate.value;
     if (from != null) {
       repos = repos.where((r) => DateTime.parse(r.updatedAt).isAfter(from)).toList();
     }
@@ -107,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
       repos = repos.where((r) => DateTime.parse(r.updatedAt).isBefore(to.add(const Duration(days: 1)))).toList();
     }
 
-    switch (_filterBy.value) {
+    switch (controller.filterBy.value) {
       case 'updated':
         repos.sort((a, b) => DateTime.parse(b.updatedAt).compareTo(DateTime.parse(a.updatedAt)));
         break;
@@ -121,37 +56,65 @@ class _HomeScreenState extends State<HomeScreen> {
     return repos;
   }
 
-  Widget _buildUserInfo() {
-    if (_error.value.isNotEmpty) {
-      return Center(child: Text(_error.value, style: const TextStyle(color: Colors.red)));
-    }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('GitHub: ${widget.username}'),
+        actions: [
+          Obx(() => IconButton(
+            icon: Icon(_isGridView.value ? Icons.list : Icons.grid_view),
+            onPressed: () => _isGridView.value = !_isGridView.value,
+          )),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: () => controller.fetchUserAndRepos(widget.username)),
+        ],
+      ),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
+        if (controller.error.value.isNotEmpty) {
+          return Center(child: Text(controller.error.value, style: const TextStyle(color: Colors.red)));
+        }
+
+        return Column(
+          children: [
+            _buildUserInfo(),
+            _buildSearchAndFilter(),
+            const SizedBox(height: 16),
+            Expanded(child: _buildRepoList()),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildUserInfo() {
+    final user = controller.user.value;
     return Card(
       margin: const EdgeInsets.all(16),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 50,
-              backgroundImage: NetworkImage(_user.value.avatarUrl),
-            ),
+            CircleAvatar(radius: 50, backgroundImage: NetworkImage(user.avatarUrl)),
             const SizedBox(height: 12),
             Text(
-              _user.value.name.isNotEmpty ? _user.value.name : widget.username,
+              user.name.isNotEmpty ? user.name : widget.username,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            if (_user.value.bio.isNotEmpty) ...[
+            if (user.bio.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(_user.value.bio, style: const TextStyle(color: Colors.grey)),
+              Text(user.bio, style: const TextStyle(color: Colors.grey)),
             ],
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildStat('Repos', _user.value.publicRepos.toString()),
-                _buildStat('Followers', _user.value.followers.toString()),
-                _buildStat('Following', _user.value.following.toString()),
+                _buildStat('Repos', user.publicRepos.toString()),
+                _buildStat('Followers', user.followers.toString()),
+                _buildStat('Following', user.following.toString()),
               ],
             ),
           ],
@@ -169,80 +132,46 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('GitHub: ${widget.username}'),
-        actions: [
-          Obx(() => IconButton(
-            icon: Icon(_isGridView.value ? Icons.list : Icons.grid_view),
-            onPressed: () => _isGridView.value = !_isGridView.value,
-          )),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchUserAndRepos),
+  Widget _buildSearchAndFilter() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(
+              labelText: 'Search repositories',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Obx(() => DropdownButton<String>(
+                value: controller.filterBy.value,
+                items: ['name', 'updated', 'stars']
+                    .map((s) => DropdownMenuItem(value: s, child: Text(_capitalize(s))))
+                    .toList(),
+                onChanged: controller.updateFilter,
+              )),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _pickDateRange,
+                icon: const Icon(Icons.date_range, size: 16),
+                label: const Text('Date'),
+              ),
+            ],
+          ),
         ],
       ),
-      body: Obx(() {
-        if (_isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        return Column(
-          children: [
-            _buildUserInfo(),
-            // Search & Filter
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      labelText: 'Search repositories',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      DropdownButton<String>(
-                        value: _filterBy.value,
-                        items: [
-                          'name',
-                          'updated',
-                          'stars',
-                        ].map((s) => DropdownMenuItem(value: s, child: Text(_capitalize(s)))).toList(),
-                        onChanged: (v) => _filterBy.value = v!,
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: _pickDateRange,
-                        icon: const Icon(Icons.date_range, size: 16),
-                        label: const Text('Date'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Repo List/Grid
-            Expanded(
-              child: _buildRepoList(),
-            ),
-          ],
-        );
-      }),
     );
   }
 
   Widget _buildRepoList() {
     final repos = _getFilteredRepos();
-    if (repos.isEmpty) {
-      return const Center(child: Text('No repositories found'));
-    }
+    if (repos.isEmpty) return const Center(child: Text('No repositories found'));
 
     return GridView.builder(
       padding: const EdgeInsets.all(16),
@@ -263,20 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    repo.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(repo.name, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                   if (repo.description.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      repo.description,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(repo.description, style: const TextStyle(fontSize: 12, color: Colors.grey), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                   const Spacer(),
                   Row(
@@ -309,9 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('Updated: ${_formatDate(repo.updatedAt)}'),
           ],
         ),
-        actions: [
-          TextButton(onPressed: Get.back, child: const Text('Close')),
-        ],
+        actions: [TextButton(onPressed: Get.back, child: const Text('Close'))],
       ),
     );
   }
@@ -323,8 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
       lastDate: DateTime.now(),
     );
     if (picked != null) {
-      _fromDate.value = picked.start;
-      _toDate.value = picked.end;
+      controller.updateDateRange(picked.start, picked.end);
       setState(() {});
     }
   }
@@ -334,7 +250,5 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  String _capitalize(String s) {
-    return s[0].toUpperCase() + s.substring(1);
-  }
+  String _capitalize(String s) => s[0].toUpperCase() + s.substring(1);
 }
