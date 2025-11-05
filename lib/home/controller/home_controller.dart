@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import '../../cores/network_service.dart';
 import '../../models/repo.dart';
 
-
 enum SortBy { name, stars, created }
-
 enum SortOrder { asc, desc }
 
 class HomeController extends GetxController {
@@ -17,8 +14,6 @@ class HomeController extends GetxController {
   final Rx<SortOrder> order = SortOrder.asc.obs;
   final RxBool loading = true.obs;
   final RxString error = ''.obs;
-  
-  // Search and date filter
   final TextEditingController searchController = TextEditingController();
   final Rx<DateTime?> fromDate = Rx<DateTime?>(null);
   final Rx<DateTime?> toDate = Rx<DateTime?>(null);
@@ -56,33 +51,25 @@ class HomeController extends GetxController {
   void applyFilter() {
     var list = List<Repository>.from(repos);
 
-    // ---- Search filter ----
+    // Search filter
     final searchQuery = searchController.text.toLowerCase().trim();
     if (searchQuery.isNotEmpty) {
       list = list.where((repo) {
         return repo.name.toLowerCase().contains(searchQuery) ||
-            (repo.description.isNotEmpty && 
-             repo.description.toLowerCase().contains(searchQuery)) ||
-            (repo.language.isNotEmpty && 
-             repo.language.toLowerCase().contains(searchQuery));
+            (repo.description.isNotEmpty && repo.description.toLowerCase().contains(searchQuery)) ||
+            (repo.language != 'N/A' && repo.language.toLowerCase().contains(searchQuery));
       }).toList();
     }
 
-    // ---- Date filter ----
+    // Date filter
     if (fromDate.value != null) {
-      list = list.where((repo) {
-        return repo.updatedAt.isAfter(fromDate.value!) ||
-            repo.updatedAt.isAtSameMomentAs(fromDate.value!);
-      }).toList();
+      list = list.where((repo) => repo.updatedAt.isAfter(fromDate.value!) || repo.updatedAt.isAtSameMomentAs(fromDate.value!)).toList();
     }
     if (toDate.value != null) {
-      list = list.where((repo) {
-        final endDate = toDate.value!.add(const Duration(days: 1));
-        return repo.updatedAt.isBefore(endDate);
-      }).toList();
+      list = list.where((repo) => repo.updatedAt.isBefore(toDate.value!.add(const Duration(days: 1)))).toList();
     }
 
-    // ---- Sorting ----
+    // Sorting
     list.sort((a, b) {
       int cmp = 0;
       switch (sortBy.value) {
@@ -102,7 +89,12 @@ class HomeController extends GetxController {
     filtered.assignAll(list);
   }
 
-  void toggleView() => isGrid.value = !isGrid.value;
+  void toggleView() => isGrid.toggle();
+
+  void toggleSortOrder() {
+    order.value = order.value == SortOrder.asc ? SortOrder.desc : SortOrder.asc;
+    applyFilter();
+  }
 
   Future<void> pickDateRange() async {
     final context = Get.context;
@@ -123,7 +115,6 @@ class HomeController extends GetxController {
       hasDateFilter.value = true;
       applyFilter();
     } else {
-      // Clear date filter if user cancels
       fromDate.value = null;
       toDate.value = null;
       hasDateFilter.value = false;

@@ -1,130 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../cores/theme_controller.dart';
 
-// Onboarding Screen
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends StatelessWidget {
   final void Function(String username) onProceed;
 
-  const OnboardingScreen({Key? key, required this.onProceed}) : super(key: key);
+  // ── 1. Make the text field observable ─────────────────────
+  final _usernameRx = ''.obs;
+  final _controller = TextEditingController();
 
-  @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
-}
-
-class _OnboardingScreenState extends State<OnboardingScreen> {
-  final TextEditingController _usernameController = TextEditingController();
-  final RxBool _isDarkMode = false.obs;
-  final RxBool _isButtonEnabled = false.obs;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTheme();
-    _usernameController.addListener(() {
-      _isButtonEnabled(_usernameController.text.trim().isNotEmpty);
+  // Listen to the native controller and push changes to the Rx
+  OnboardingScreen({super.key, required this.onProceed}) {
+    _controller.addListener(() {
+      _usernameRx.value = _controller.text.trim();
     });
   }
 
-  Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('is_dark_mode') ?? false;
-    _isDarkMode.value = isDark;
-    Get.changeThemeMode(isDark ? ThemeMode.dark : ThemeMode.light);
-  }
-
-  Future<void> _toggleTheme(bool value) async {
-    _isDarkMode.value = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_dark_mode', value);
-    Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
-  }
-
-  void _onProceed() {
-    final username = _usernameController.text.trim();
-    if (username.isNotEmpty) {
-      widget.onProceed(username);
-    }
-  }
-
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    super.dispose();
-  }
+  final _theme = Get.find<ThemeController>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Welcome'),
-        centerTitle: true,
-        elevation: 0,
+        title: const Text('GitHub Explorer'),
+        actions: [
+          Obx(() => IconButton(
+            icon: Icon(
+                _theme.isDark.value ? Icons.light_mode : Icons.dark_mode),
+            onPressed: _theme.toggle,
+          )),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0), // Fixed: EdgeInsets.all
+
+      // ── 2. Use a scrollable column (prevents overflow) ───────
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(
-              Icons.person,
-              size: 100,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 40), // space under the AppBar
+
+            Icon(Icons.code,
+                size: 80, color: Theme.of(context).colorScheme.primary),
+
+            const SizedBox(height: 20),
             Text(
               'Enter GitHub Username',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'e.g., torvalds, flutter',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+              'e.g., 777razib',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: Colors.grey),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
+
+            // ── TextField ───────────────────────────────────────
             TextField(
-              controller: _usernameController,
+              controller: _controller,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: 'Username',
-                hintText: '777razib',
-                prefixIcon: const Icon(Icons.person_outline),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.person),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 filled: true,
               ),
-              onSubmitted: (_) => _onProceed(),
+              onSubmitted: (_) => _proceed(),
             ),
             const SizedBox(height: 24),
-            Obx(() => SwitchListTile(
-              title: const Text('Dark Mode'),
-              secondary: Icon(_isDarkMode.value ? Icons.dark_mode : Icons.light_mode),
-              value: _isDarkMode.value,
-              onChanged: _toggleTheme,
-              activeColor: Colors.teal,
-            )),
-            const SizedBox(height: 32),
-            Obx(() => SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isButtonEnabled.value ? _onProceed : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isButtonEnabled.value ? null : Colors.grey,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text(
-                  'Proceed to Profile',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
+
+            // ── Proceed Button (now correctly uses the Rx) ───────
+            Obx(() => ElevatedButton(
+              onPressed: _usernameRx.value.isEmpty ? null : _proceed,
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: const Text('Proceed'),
             )),
           ],
         ),
       ),
     );
+  }
+
+  void _proceed() {
+    if (_usernameRx.value.isNotEmpty) {
+      onProceed(_usernameRx.value);
+    }
   }
 }

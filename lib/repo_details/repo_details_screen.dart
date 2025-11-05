@@ -1,30 +1,23 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../model/repo_model.dart';
+import '../../models/repo.dart';
 
-class RepoDetailsScreen extends StatelessWidget {
-  final RepoModel repo;
+class RepoDetailScreen extends StatelessWidget {
+  final Repository repo;
   final String username;
 
-  const RepoDetailsScreen({
-    Key? key,
-    required this.repo,
-    required this.username,
-  }) : super(key: key);
+  const RepoDetailScreen({super.key, required this.repo, required this.username});
 
-  String _formatDate(String iso) {
-    final date = DateTime.parse(iso);
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  String _formatDate(DateTime date) => DateFormat.yMMMd().format(date);
 
   Future<void> _launchURL(String url) async {
     final uri = Uri.parse(url);
-    try {
+    if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      // Handle error if URL cannot be launched
-      debugPrint('Error launching URL: $e');
+    } else {
+      Get.snackbar('Error', 'Cannot open $url', backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
 
@@ -35,9 +28,8 @@ class RepoDetailsScreen extends StatelessWidget {
         title: Text(repo.name),
         actions: [
           IconButton(
-            icon: const Icon(Icons.open_in_new),
+            icon: const Icon(Icons.open_in_browser),
             onPressed: () => _launchURL(repo.htmlUrl),
-            tooltip: 'Open in browser',
           ),
         ],
       ),
@@ -46,170 +38,49 @@ class RepoDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Repository Name and Privacy Badge
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    repo.name,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Chip(
-                  label: Text(repo.isPrivate ? 'Private' : 'Public'),
-                  backgroundColor: repo.isPrivate 
-                    ? Colors.orange.withOpacity(0.2)
-                    : Colors.green.withOpacity(0.2),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Description
-            if (repo.description.isNotEmpty) ...[
-              Text(
-                repo.description,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            // Stats Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    Icons.star,
-                    'Stars',
-                    repo.stargazersCount.toString(),
-                    Colors.amber,
-                  ),
-                ),
+                CircleAvatar(radius: 30, backgroundImage: NetworkImage(repo.ownerAvatar)),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _buildStatCard(
-                    context,
-                    Icons.call_split,
-                    'Forks',
-                    repo.forksCount.toString(),
-                    Colors.blue,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(repo.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text('by $username', style: const TextStyle(color: Colors.grey)),
+                    ],
                   ),
                 ),
+                Chip(label: Text(repo.isPrivate ? 'Private' : 'Public')),
               ],
             ),
-            const SizedBox(height: 12),
+            const Divider(height: 30),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    Icons.visibility,
-                    'Watchers',
-                    repo.watchersCount.toString(),
-                    Colors.purple,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    Icons.bug_report,
-                    'Issues',
-                    repo.openIssuesCount.toString(),
-                    Colors.red,
-                  ),
-                ),
+                _stat(Icons.star, repo.stargazersCount, 'Stars', Colors.amber),
+                _stat(Icons.fork_left, repo.forksCount, 'Forks', Colors.blue),
+                _stat(Icons.visibility, repo.watchersCount, 'Watchers', Colors.purple),
               ],
             ),
-            const SizedBox(height: 24),
-
-            // Language
-            if (repo.language != null) ...[
-              _buildInfoRow(context, Icons.code, 'Language', repo.language!),
-              const SizedBox(height: 16),
-            ],
-
-            // Default Branch
-            _buildInfoRow(context, Icons.account_tree, 'Default Branch', repo.defaultBranch),
-            const SizedBox(height: 16),
-
-            // Created Date
-            _buildInfoRow(
-              context,
-              Icons.calendar_today,
-              'Created',
-              _formatDate(repo.createdAt),
-            ),
-            const SizedBox(height: 16),
-
-            // Updated Date
-            _buildInfoRow(
-              context,
-              Icons.update,
-              'Last Updated',
-              _formatDate(repo.updatedAt),
-            ),
-            const SizedBox(height: 24),
-
-            // Homepage
-            if (repo.homepage != null && repo.homepage!.isNotEmpty) ...[
-              _buildInfoRow(
-                context,
-                Icons.home,
-                'Homepage',
-                repo.homepage!,
-                isLink: true,
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            // Actions
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _launchURL(repo.htmlUrl),
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('Open on GitHub'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-    Color color,
-  ) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
+            const Divider(height: 30),
+            const Text('Description', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey,
-              ),
+            Text(repo.description.isEmpty ? 'No description' : repo.description),
+            const SizedBox(height: 20),
+            _infoRow('Language', repo.language),
+            _infoRow('Default Branch', repo.defaultBranch),
+            _infoRow('Issues', '${repo.openIssuesCount}'),
+            _infoRow('Created', _formatDate(repo.createdAt)),
+            _infoRow('Updated', _formatDate(repo.updatedAt)),
+            if (repo.homepage != null && repo.homepage!.isNotEmpty)
+              _infoRow('Homepage', repo.homepage!, isLink: true, onTap: () => _launchURL(repo.homepage!)),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.open_in_browser),
+              label: const Text('Open on GitHub'),
+              onPressed: () => _launchURL(repo.htmlUrl),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
             ),
           ],
         ),
@@ -217,49 +88,29 @@ class RepoDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value, {
-    bool isLink = false,
-  }) {
-    return Row(
+  Widget _stat(IconData icon, int value, String label, Color color) => Column(
+    children: [
+      Icon(icon, size: 32, color: color),
+      const SizedBox(height: 4),
+      Text('$value', style: const TextStyle(fontSize: 20)),
+      Text(label, style: const TextStyle(color: Colors.grey)),
+    ],
+  );
+
+  Widget _infoRow(String title, String value, {bool isLink = false, VoidCallback? onTap}) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
       children: [
-        Icon(icon, size: 20, color: Colors.grey),
-        const SizedBox(width: 12),
+        SizedBox(width: 100, child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold))),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 4),
-              if (isLink)
-                GestureDetector(
-                  onTap: () => _launchURL(value),
-                  child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.blue,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                )
-              else
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-            ],
-          ),
+          child: isLink
+              ? GestureDetector(
+            onTap: onTap,
+            child: Text(value, style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline)),
+          )
+              : Text(value),
         ),
       ],
-    );
-  }
+    ),
+  );
 }
-

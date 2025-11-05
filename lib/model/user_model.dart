@@ -1,4 +1,3 @@
-/*
 
 // Models
 class UserModel {
@@ -43,4 +42,3 @@ class UserModel {
   );
 }
 
-*/

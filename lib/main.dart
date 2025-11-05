@@ -1,4 +1,3 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'cores/theme_controller.dart';
@@ -8,36 +7,35 @@ import 'onboding/onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(MyApp());
+  Get.put(ThemeController());
+  Get.put(LoginController()); // Initialize LoginController
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    // Initialize ThemeController
-    Get.put(ThemeController());
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'GitHub User Profile App',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
+      theme: ThemeData.light(useMaterial3: true),
+      darkTheme: ThemeData.dark(useMaterial3: true),
       themeMode: ThemeMode.system,
       home: OnboardingScreen(
         onProceed: (username) async {
-          // Fetch user data before navigating
-          final loginCtrl = Get.put(LoginController());
+          final loginCtrl = Get.find<LoginController>();
           final user = await loginCtrl.login(username);
           if (user != null) {
             Get.offAll(() => HomeScreen(user: user));
           } else {
-            // Show error if user not found
             Get.snackbar(
               'Error',
-              loginCtrl.error.value.isNotEmpty 
-                ? loginCtrl.error.value 
-                : 'Failed to load user',
+              loginCtrl.error.value.isNotEmpty ? loginCtrl.error.value : 'Failed to load user',
               backgroundColor: Colors.red,
               colorText: Colors.white,
+              snackPosition: SnackPosition.BOTTOM,
             );
           }
         },
@@ -45,10 +43,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-

@@ -17,7 +17,7 @@ class LoginController extends GetxController {
       final user = await GitHubApi.getUser(username.trim());
       return user;
     } catch (e) {
-      error.value = e.toString();
+      error.value = e.toString().replaceFirst('Exception: ', '');
       return null;
     } finally {
       isLoading(false);

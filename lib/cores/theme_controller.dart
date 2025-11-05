@@ -1,4 +1,3 @@
-// lib/cores/theme_controller.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,9 +19,9 @@ class ThemeController extends GetxController {
   }
 
   void toggle() async {
-    isDark(!isDark.value);
+    isDark.toggle();
     final prefs = await SharedPreferences.getInstance();
-    prefs.setBool(_key, isDark.value);
+    await prefs.setBool(_key, isDark.value);
     Get.changeThemeMode(isDark.value ? ThemeMode.dark : ThemeMode.light);
   }
 }
