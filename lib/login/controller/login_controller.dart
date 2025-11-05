@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-
 import '../../cores/network_service.dart';
 import '../../models/user.dart';
 
