@@ -1,7 +1,4 @@
-/*
-
-// Models
-class UserModel {
+class GitHubUser {
   final String login;
   final String name;
   final String bio;
@@ -10,7 +7,7 @@ class UserModel {
   final int followers;
   final int following;
 
-  UserModel({
+  GitHubUser({
     required this.login,
     required this.name,
     required this.bio,
@@ -20,8 +17,8 @@ class UserModel {
     required this.following,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
+  factory GitHubUser.fromJson(Map<String, dynamic> json) {
+    return GitHubUser(
       login: json['login'] ?? '',
       name: json['name'] ?? '',
       bio: json['bio'] ?? '',
@@ -31,16 +28,4 @@ class UserModel {
       following: json['following'] ?? 0,
     );
   }
-
-  static UserModel empty() => UserModel(
-    login: '',
-    name: '',
-    bio: '',
-    avatarUrl: '',
-    publicRepos: 0,
-    followers: 0,
-    following: 0,
-  );
 }
-
-*/
