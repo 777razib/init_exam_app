@@ -17,6 +17,7 @@ class MyApp extends StatelessWidget {
     // Initialize ThemeController
     Get.put(ThemeController());
     return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'GitHub User Profile App',
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark(),
