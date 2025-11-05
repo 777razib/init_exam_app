@@ -91,7 +91,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: 'Username',
-                hintText: 'razib777',
+                hintText: '777razib',
                 prefixIcon: const Icon(Icons.person_outline),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
